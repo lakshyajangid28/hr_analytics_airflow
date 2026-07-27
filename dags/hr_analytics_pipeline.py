@@ -74,7 +74,9 @@ def run_dbt():
     response = requests.post(
         run_url,
         headers=headers,
-        json={}
+        json={
+            "cause": "Triggered by Airflow"
+        }
     )
 
     response.raise_for_status()
