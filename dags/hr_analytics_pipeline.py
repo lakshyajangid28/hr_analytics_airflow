@@ -1,11 +1,12 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.email import EmailOperator
+from airflow.utils.trigger_rule import TriggerRule
 from airflow.models import Variable
 from datetime import datetime
 
 import requests
 import time
-
 
 # -----------------------------
 # Configuration
@@ -13,7 +14,6 @@ import time
 
 ACCOUNT_ID = "70506183150011"
 JOB_ID = "70506183135984"
-
 
 # -----------------------------
 # Snowflake Procedure Execution
@@ -109,7 +109,7 @@ def run_dbt():
         if status == 10:
             return
 
-        # Error / Cancelled
+        # Failed / Cancelled
         elif status in [20, 30]:
             raise Exception(
                 f"dbt run failed. Run ID: {run_id}. "
@@ -117,6 +117,7 @@ def run_dbt():
             )
 
         time.sleep(20)
+
 
 # -----------------------------
 # DAG Definition
@@ -140,4 +141,53 @@ with DAG(
         python_callable=run_dbt
     )
 
+    success_email = EmailOperator(
+        task_id="success_email",
+        to="YOUR_EMAIL@gmail.com",
+        subject="✅ HR Analytics Pipeline Completed Successfully",
+        html_content="""
+        <h2>HR Analytics Pipeline Success</h2>
+
+        <p>The Airflow pipeline completed successfully.</p>
+
+        <ul>
+            <li>Snowflake Procedure Executed ✅</li>
+            <li>dbt Run Completed ✅</li>
+            <li>dbt Snapshot Completed ✅</li>
+        </ul>
+
+        <p><strong>DAG:</strong> hr_analytics_pipeline</p>
+        <p><strong>Execution Time:</strong> {{ ts }}</p>
+
+        <p>Regards,<br>
+        Airflow / Astronomer</p>
+        """
+    )
+
+    failure_email = EmailOperator(
+        task_id="failure_email",
+        to="YOUR_EMAIL@gmail.com",
+        subject="❌ HR Analytics Pipeline Failed",
+        html_content="""
+        <h2>HR Analytics Pipeline Failed</h2>
+
+        <p>One or more tasks in the pipeline failed.</p>
+
+        <ul>
+            <li>DAG: hr_analytics_pipeline</li>
+            <li>Execution Time: {{ ts }}</li>
+        </ul>
+
+        <p>Please review the Airflow/Astronomer logs for details.</p>
+
+        <p>Regards,<br>
+        Airflow / Astronomer</p>
+        """,
+        trigger_rule=TriggerRule.ONE_FAILED
+    )
+
     load_employee_task >> dbt_task
+
+    dbt_task >> success_email
+
+    [load_employee_task, dbt_task] >> failure_email
