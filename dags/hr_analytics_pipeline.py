@@ -143,7 +143,7 @@ with DAG(
 
     success_email = EmailOperator(
         task_id="success_email",
-        to="YOUR_EMAIL@gmail.com",
+        to="lakshyajangid007@gmail.com",
         subject="✅ HR Analytics Pipeline Completed Successfully",
         html_content="""
         <h2>HR Analytics Pipeline Success</h2>
@@ -166,7 +166,7 @@ with DAG(
 
     failure_email = EmailOperator(
         task_id="failure_email",
-        to="YOUR_EMAIL@gmail.com",
+        to="lakshyajangid007@gmail.com",
         subject="❌ HR Analytics Pipeline Failed",
         html_content="""
         <h2>HR Analytics Pipeline Failed</h2>
