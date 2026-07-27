@@ -1,4 +1,3 @@
 apache-airflow-providers-snowflake
 apache-airflow-providers-dbt-cloud
-snowflake-connector-python
 requests==2.32.3
