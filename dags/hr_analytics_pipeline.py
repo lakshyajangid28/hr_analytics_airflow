@@ -1,7 +1,5 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators.email import EmailOperator
-from airflow.utils.trigger_rule import TriggerRule
 from airflow.models import Variable
 from datetime import datetime
 
@@ -141,53 +139,4 @@ with DAG(
         python_callable=run_dbt
     )
 
-    success_email = EmailOperator(
-        task_id="success_email",
-        to="lakshyajangid007@gmail.com",
-        subject="✅ HR Analytics Pipeline Completed Successfully",
-        html_content="""
-        <h2>HR Analytics Pipeline Success</h2>
-
-        <p>The Airflow pipeline completed successfully.</p>
-
-        <ul>
-            <li>Snowflake Procedure Executed ✅</li>
-            <li>dbt Run Completed ✅</li>
-            <li>dbt Snapshot Completed ✅</li>
-        </ul>
-
-        <p><strong>DAG:</strong> hr_analytics_pipeline</p>
-        <p><strong>Execution Time:</strong> {{ ts }}</p>
-
-        <p>Regards,<br>
-        Airflow / Astronomer</p>
-        """
-    )
-
-    failure_email = EmailOperator(
-        task_id="failure_email",
-        to="lakshyajangid007@gmail.com",
-        subject="❌ HR Analytics Pipeline Failed",
-        html_content="""
-        <h2>HR Analytics Pipeline Failed</h2>
-
-        <p>One or more tasks in the pipeline failed.</p>
-
-        <ul>
-            <li>DAG: hr_analytics_pipeline</li>
-            <li>Execution Time: {{ ts }}</li>
-        </ul>
-
-        <p>Please review the Airflow/Astronomer logs for details.</p>
-
-        <p>Regards,<br>
-        Airflow / Astronomer</p>
-        """,
-        trigger_rule=TriggerRule.ONE_FAILED
-    )
-
     load_employee_task >> dbt_task
-
-    dbt_task >> success_email
-
-    [load_employee_task, dbt_task] >> failure_email
