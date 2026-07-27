@@ -1,9 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.models import Variable
 from datetime import datetime
+
 import requests
 import time
-from airflow.models import Variable
+
 
 # -----------------------------
 # Configuration
@@ -12,54 +14,65 @@ from airflow.models import Variable
 ACCOUNT_ID = "70506183150011"
 JOB_ID = "70506183135984"
 
-DBT_TOKEN = Variable.get("DBT_TOKEN")
-
-SNOWFLAKE_USER = Variable.get("SNOWFLAKE_USER")
-SNOWFLAKE_PASSWORD = Variable.get("SNOWFLAKE_PASSWORD")
-SNOWFLAKE_ACCOUNT = Variable.get("SNOWFLAKE_ACCOUNT")
 
 # -----------------------------
-# Procedure Execution
+# Snowflake Procedure Execution
 # -----------------------------
 
 def load_employee_data():
 
     import snowflake.connector
 
+    snowflake_user = Variable.get("SNOWFLAKE_USER")
+    snowflake_password = Variable.get("SNOWFLAKE_PASSWORD")
+    snowflake_account = Variable.get("SNOWFLAKE_ACCOUNT")
+
     conn = snowflake.connector.connect(
-        user=SNOWFLAKE_USER,
-        password=SNOWFLAKE_PASSWORD,
-        account=SNOWFLAKE_ACCOUNT,
+        user=snowflake_user,
+        password=snowflake_password,
+        account=snowflake_account,
         warehouse="COMPUTE_WH",
         database="HR_ANALYTICS_DB",
         schema="RAW"
     )
 
-    cur = conn.cursor()
+    try:
 
-    cur.execute("CALL LOAD_EMPLOYEE_DATA();")
+        cur = conn.cursor()
 
-    print(cur.fetchone())
+        cur.execute("CALL LOAD_EMPLOYEE_DATA();")
 
-    cur.close()
-    conn.close()
+        result = cur.fetchone()
+
+        print(f"Procedure Result: {result}")
+
+        cur.close()
+
+    finally:
+
+        conn.close()
 
 
 # -----------------------------
-# Trigger dbt Job
+# Trigger dbt Cloud Job
 # -----------------------------
 
 def run_dbt():
 
+    dbt_token = Variable.get("DBT_TOKEN")
+
     headers = {
-        "Authorization": f"Token {DBT_TOKEN}",
+        "Authorization": f"Token {dbt_token}",
         "Content-Type": "application/json"
     }
 
-    url = f"https://cloud.getdbt.com/api/v2/accounts/{ACCOUNT_ID}/jobs/{JOB_ID}/run/"
+    run_url = (
+        f"https://cloud.getdbt.com/api/v2/accounts/"
+        f"{ACCOUNT_ID}/jobs/{JOB_ID}/run/"
+    )
 
     response = requests.post(
-        url,
+        run_url,
         headers=headers,
         json={}
     )
@@ -68,58 +81,56 @@ def run_dbt():
 
     run_id = response.json()["data"]["id"]
 
-    print(f"dbt Run Started : {run_id}")
+    print(f"dbt run started: {run_id}")
 
     while True:
 
-        status = requests.get(
-            f"https://cloud.getdbt.com/api/v2/accounts/{ACCOUNT_ID}/runs/{run_id}/",
+        status_response = requests.get(
+            f"https://cloud.getdbt.com/api/v2/accounts/"
+            f"{ACCOUNT_ID}/runs/{run_id}/",
             headers=headers
-        ).json()["data"]["status"]
+        )
 
+        status_response.raise_for_status()
+
+        status = status_response.json()["data"]["status"]
+
+        print(f"Current Status: {status}")
+
+        # Success
         if status == 10:
-            print("dbt Success")
+            print("dbt run completed successfully")
             break
 
+        # Error / Cancelled
         elif status in [20, 30]:
-            raise Exception("dbt Failed")
+            raise Exception("dbt run failed")
 
+        # Running
         else:
             time.sleep(20)
 
 
 # -----------------------------
-# DAG
+# DAG Definition
 # -----------------------------
 
 with DAG(
-
     dag_id="hr_analytics_pipeline",
-
-    start_date=datetime(2026,7,1),
-
+    start_date=datetime(2025, 1, 1),
     schedule="@daily",
-
     catchup=False,
-
-    tags=["HR","Snowflake","dbt"]
-
+    tags=["HR", "Snowflake", "dbt"]
 ) as dag:
 
-    load = PythonOperator(
-
+    load_employee_task = PythonOperator(
         task_id="load_employee_data",
-
         python_callable=load_employee_data
-
     )
 
-    dbt = PythonOperator(
-
+    dbt_task = PythonOperator(
         task_id="run_dbt",
-
         python_callable=run_dbt
-
     )
 
-    load >> dbt
+    load_employee_task >> dbt_task
