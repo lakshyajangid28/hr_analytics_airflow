@@ -62,7 +62,7 @@ def run_dbt():
     dbt_token = Variable.get("DBT_TOKEN")
 
     headers = {
-        "Authorization": f"Bearer {dbt_token}",
+        "Authorization": f"Token {dbt_token}",
         "Content-Type": "application/json"
     }
 
@@ -79,7 +79,12 @@ def run_dbt():
         }
     )
 
-    response.raise_for_status()
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to trigger dbt job. "
+            f"Status Code: {response.status_code}. "
+            f"Response: {response.text}"
+        )
 
     run_id = response.json()["data"]["id"]
 
@@ -91,15 +96,25 @@ def run_dbt():
             headers=headers
         )
 
-        status_response.raise_for_status()
+        if status_response.status_code != 200:
+            raise Exception(
+                f"Failed to fetch dbt run status. "
+                f"Status Code: {status_response.status_code}. "
+                f"Response: {status_response.text}"
+            )
 
         status = status_response.json()["data"]["status"]
 
+        # Success
         if status == 10:
-            break
+            return
 
+        # Error / Cancelled
         elif status in [20, 30]:
-            raise Exception("dbt run failed")
+            raise Exception(
+                f"dbt run failed. Run ID: {run_id}. "
+                f"Response: {status_response.text}"
+            )
 
         time.sleep(20)
 
