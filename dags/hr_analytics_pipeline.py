@@ -125,7 +125,7 @@ def run_dbt():
 
 with DAG(
     dag_id="hr_analytics_pipeline",
-    start_date=datetime(2026, 01, 01),
+    start_date=datetime(2026, 1, 1),
     schedule="@daily",
     catchup=False,
     tags=["HR", "Snowflake", "dbt"]
