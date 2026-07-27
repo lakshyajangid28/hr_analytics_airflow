@@ -60,9 +60,13 @@ def load_employee_data():
 def run_dbt():
 
     dbt_token = Variable.get("DBT_TOKEN")
+    print(f"Account ID: {ACCOUNT_ID}")
+    print(f"Job ID: {JOB_ID}")
+    print(f"Token Exists: {bool(dbt_token)}")
+    print(f"Token Prefix: {dbt_token[:10]}")
 
     headers = {
-        "Authorization": f"Token {dbt_token}",
+        "Authorization": f"Bearer {dbt_token}",
         "Content-Type": "application/json"
     }
 
