@@ -60,10 +60,6 @@ def load_employee_data():
 def run_dbt():
 
     dbt_token = Variable.get("DBT_TOKEN")
-    print(f"Account ID: {ACCOUNT_ID}")
-    print(f"Job ID: {JOB_ID}")
-    print(f"Token Exists: {bool(dbt_token)}")
-    print(f"Token Prefix: {dbt_token[:10]}")
 
     headers = {
         "Authorization": f"Bearer {dbt_token}",
@@ -71,7 +67,7 @@ def run_dbt():
     }
 
     run_url = (
-        f"https://cloud.getdbt.com/api/v2/accounts/"
+        f"https://ef420.us1.dbt.com/api/v2/accounts/"
         f"{ACCOUNT_ID}/jobs/{JOB_ID}/run/"
     )
 
@@ -85,12 +81,10 @@ def run_dbt():
 
     run_id = response.json()["data"]["id"]
 
-    print(f"dbt run started: {run_id}")
-
     while True:
 
         status_response = requests.get(
-            f"https://cloud.getdbt.com/api/v2/accounts/"
+            f"https://ef420.us1.dbt.com/api/v2/accounts/"
             f"{ACCOUNT_ID}/runs/{run_id}/",
             headers=headers
         )
@@ -99,21 +93,13 @@ def run_dbt():
 
         status = status_response.json()["data"]["status"]
 
-        print(f"Current Status: {status}")
-
-        # Success
         if status == 10:
-            print("dbt run completed successfully")
             break
 
-        # Error / Cancelled
         elif status in [20, 30]:
             raise Exception("dbt run failed")
 
-        # Running
-        else:
-            time.sleep(20)
-
+        time.sleep(20)
 
 # -----------------------------
 # DAG Definition
